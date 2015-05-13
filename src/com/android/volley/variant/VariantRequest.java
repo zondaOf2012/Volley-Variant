@@ -10,118 +10,37 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.json.JSONException;
-
 import android.text.TextUtils;
 
 import com.android.volley.AuthFailureError;
-import com.android.volley.Cache;
-import com.android.volley.Cache.Entry;
-import com.android.volley.NetworkResponse;
-import com.android.volley.ParseError;
 import com.android.volley.Request;
 import com.android.volley.Response;
 import com.android.volley.VolleyLog;
-import com.android.volley.toolbox.HttpHeaderParser;
-import com.google.zakergson.JsonSyntaxException;
 
-public abstract class VariantRequest<T extends BasicJsonResult> extends Request<T> {
+public abstract class VariantRequest<T> extends Request<T> {
 
   /** Default charset for JSON request. */
   protected static final String PROTOCOL_CHARSET = "utf-8";
 
-  private static final long sDefaultCacheMaxAge = 10 * 60 * 1000L;// 十分钟
-
-  private static final long sDefaultCacheTtl = 30 * 24 * 60 * 60 * 1000L;// 30天
-
   private OnVariantResponseListener<T> mResponseListener;
 
   private final Map<String, String> mRequestParams;
-
-  private long mCacheMaxAge = sDefaultCacheMaxAge;
-
+  
+  private VariantRetryPolicy mVariantRetryPolicy;
+  
   public VariantRequest(int method, String url) {
 
     super(method, url, null);
 
     mRequestParams = new HashMap<String, String>();
-    
+
     setRetryPolicy(new VariantRetryPolicy());
   }
-
-  public abstract T getJsonResultEntity();
-
+  
   @Override
-  public Response<T> parseNetworkResponse(NetworkResponse response) {
+  public VariantRetryPolicy getRetryPolicy() {
 
-    try {
-
-      VolleyLog.v("ZBasedRequest parseNetworkResponse response headers: %s",
-          response.headers.toString());
-
-      String charset = HttpHeaderParser.parseCharset(response.headers, PROTOCOL_CHARSET);
-
-      String responseStr = new String(response.data, charset);
-
-      Cache.Entry cacheEntry = parseCache(response);
-
-      T result = BasicJsonResult.convertFromJson(getJsonResultEntity(), responseStr);
-
-      Response<T> serverResponse = Response.success(result, cacheEntry);
-
-      return serverResponse;
-
-    } catch (JsonSyntaxException e) {
-
-      return Response.error(new ParseError(e));
-    } catch (UnsupportedEncodingException e) {
-
-      return Response.error(new ParseError(e));
-    } catch (JSONException e) {
-
-      return Response.error(new ParseError(e));
-    }
-  }
-
-  protected final Entry parseCache(NetworkResponse response) {
-
-    long now = System.currentTimeMillis();
-
-    Cache.Entry entry = new Cache.Entry();
-
-    entry.ttl = now + sDefaultCacheTtl;
-
-    entry.softTtl = now + mCacheMaxAge;
-
-    VolleyLog.v("ZBasedRequest parseCache ttl: %s - currentTimeMillis: %s - softTtl: %s",
-        entry.ttl, System.currentTimeMillis(), entry.softTtl);
-
-    Map<String, String> headers = response.headers;
-
-    long serverDate = 0;
-
-    long lastModified = 0;
-
-    String headerValue = headers.get("Date");
-
-    if (headerValue != null) {
-      serverDate = HttpHeaderParser.parseDateAsEpoch(headerValue);
-    }
-
-    headerValue = headers.get("Last-Modified");
-
-    if (headerValue != null) {
-
-      lastModified = HttpHeaderParser.parseDateAsEpoch(headerValue);
-    }
-
-    entry.data = response.data;
-    entry.etag = headers.get("ETag");
-    entry.serverDate = serverDate;
-    entry.lastModified = lastModified;
-    entry.responseHeaders = headers;
-
-    return entry;
+    return mVariantRetryPolicy;
   }
 
   @Override
@@ -151,7 +70,7 @@ public abstract class VariantRequest<T extends BasicJsonResult> extends Request<
   }
 
   @Override
-  public final String getUrl() {
+  public String getUrl() {
 
     String url = super.getUrl();
 
@@ -412,15 +331,6 @@ public abstract class VariantRequest<T extends BasicJsonResult> extends Request<
 
       addRequestParam(entry.getKey(), entry.getValue());
     }
-  }
-
-  /**
-   * 设定请求的本地缓存时间(单位:毫秒)
-   * 
-   * @param cacheMaxAge
-   */
-  public void setCacheMaxAge(long cacheMaxAge) {
-    this.mCacheMaxAge = cacheMaxAge;
   }
 
   public final void setResponseListener(OnVariantResponseListener<T> responseListener) {

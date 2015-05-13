@@ -12,7 +12,7 @@ public class VariantRetryPolicy implements RetryPolicy {
   private int mCurrentRetryCount;
 
   /** The maximum number of attempts. */
-  private final int mMaxNumRetries;
+  private int mMaxNumRetries;
 
   /** The backoff multiplier for the policy. */
   private final float mBackoffMultiplier;
@@ -86,5 +86,13 @@ public class VariantRetryPolicy implements RetryPolicy {
    */
   protected boolean hasAttemptRemaining() {
       return mCurrentRetryCount <= mMaxNumRetries;
+  }
+  
+  public void setMaxNumRetries(int maxNumRetries) {
+    this.mMaxNumRetries = maxNumRetries;
+  }
+  
+  public void setCurrentTimeoutMs(int currentTimeoutMs) {
+    this.mCurrentTimeoutMs = currentTimeoutMs;
   }
 }
